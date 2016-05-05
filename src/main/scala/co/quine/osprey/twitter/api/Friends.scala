@@ -18,7 +18,7 @@ trait Friends {
       userId map ("user_id" -> _),
       screenName map ("screen_name" -> _.toString)).flatten.toMap
 
-    get(s"$uri/friends/list.json", params).map(r => Parse.decodeOption[UserList](r.body))
+    Parse.decodeOption[UserList](get(s"$uri/friends/list.json", params).body)
   }
 
   def friendsIds(userId: Option[String] = None,
@@ -30,6 +30,6 @@ trait Friends {
       userId map ("user_id" -> _),
       screenName map ("screen_name" -> _.toString)).flatten.toMap
 
-    get(s"$uri/friends/ids.json", params).map(r => Parse.decodeOption[UserIds](r.body))
+    Parse.decodeOption[UserIds](get(s"$uri/friends/ids.json", params).body)
   }
 }

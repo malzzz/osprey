@@ -11,10 +11,13 @@ import co.quine.gatekeeperclient._
 import co.quine.osprey.twitter.TwitterService
 
 class Osprey extends TwitterService {
-
   implicit val system = ActorSystem("osprey")
+
+  import system.dispatcher
+
   implicit val materializer = ActorMaterializer()
 
   implicit val gatekeeper = new GatekeeperClient()
+
 
 }

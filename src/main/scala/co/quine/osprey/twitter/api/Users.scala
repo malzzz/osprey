@@ -2,7 +2,6 @@ package co.quine.osprey.twitter
 package api
 
 import argonaut._, Argonaut._
-import scala.concurrent.ExecutionContext.Implicits.global
 
 trait Users {
   self: TwitterService =>
@@ -17,7 +16,7 @@ trait Users {
       userId map ("user_id" -> _),
       screenName map ("screen_name" -> _)).flatten.toMap
 
-    get(s"$uri/users/show.json", params).map(r => Parse.decodeValidation[User](r.body))
+    Parse.decodeOption[User](get(s"$uri/users/show.json", params).body)
   }
 
   def usersLookup(userId: Seq[String] = Seq.empty[String], screenName: Seq[String] = Seq.empty[String]) = {
@@ -29,6 +28,6 @@ trait Users {
       Some("screen_name" -> screenName.mkString(","))
     ).flatten.toMap
 
-    get(s"$uri/users/lookup.json", params).map(r => Parse.decodeOption[Seq[User]](r.body))
+    Parse.decodeOption[Seq[User]](get(s"$uri/users/lookup.json", params).body)
   }
 }

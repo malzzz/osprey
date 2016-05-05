@@ -26,7 +26,7 @@ trait TwitterService
     case gatekeeper.ResponseToken(id, token: gatekeeper.ConsumerToken) => Token(token.key, token.secret)
   }
 
-  def get(path: String, params: Map[String, String]): Future[HttpResponse[String]] = Future {
+  def get(path: String, params: Map[String, String]): HttpResponse[String] = {
     var gateRequestId: String = ""
     val request = Http(path).params(params)
     val signed = getCredential(path) match {
@@ -45,7 +45,7 @@ trait TwitterService
       val reset = response.header("X-Rate-Limit-Reset").getOrElse(0).asInstanceOf[Long]
       gatekeeper.updateRateLimit(gateRequestId, remaining, reset)
     }
-    ***/
+      ***/
     response
   }
 
