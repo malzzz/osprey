@@ -5,7 +5,7 @@ import akka.util.Timeout
 
 import scalaj.http._
 import scalaj.http.{Token => httpToken}
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, Future, Promise}
 import scala.concurrent.duration._
 import co.quine.gatekeeperclient._
 import co.quine.osprey._
@@ -21,7 +21,7 @@ trait TwitterService
   import GatekeeperClient._
 
   implicit val system: ActorSystem
-  implicit lazy val timeout = Timeout(5.seconds)
+  implicit val timeout = Timeout(5.seconds)
 
   val uri = "https://api.twitter.com/1.1"
 
@@ -32,7 +32,8 @@ trait TwitterService
   }
 
   implicit class HttpRequests(request: HttpRequest) {
-    def signThenGetResponse: HttpResponse[String] = {
+    def signThenGetResponse: Future[HttpResponse[String]] = {
+      val futureResponse = Promise[HttpResponse[String]]()
       val path = request.url.diff(uri)
       val token = path match {
         case "/users/show.json" => gatekeeper.usersShow
@@ -46,14 +47,17 @@ trait TwitterService
         case "/followers/list.json" => gatekeeper.followersList
       }
 
-      token match {
-        case AccessToken(k, s) => gateUpdate(path, k, request.oauth(consumer, Token(k, s)))
-        case BearerToken(k) => gateUpdate(path, k, request.header("Authorization", s"Bearer $k"))
+      token onSuccess {
+        case AccessToken(k, s) => futureResponse.success(gateUpdate(path, k, request.oauth(consumer, Token(k, s))))
+        case BearerToken(k) => futureResponse.success(gateUpdate(path, k, request.header("Authorization", s"Bearer $k")))
       }
+      futureResponse.future
     }
   }
 
-  def get(path: String, params: Map[String, String]): HttpResponse[String] = Http(path).params(params).signThenGetResponse
+  def get(path: String, params: Map[String, String]): Future[HttpResponse[String]] = {
+    Http(path).params(params).signThenGetResponse
+  }
 
   def gateUpdate(path: String, key: String, request: HttpRequest) = {
     val response = request.asString

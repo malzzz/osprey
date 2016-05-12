@@ -1,33 +1,35 @@
 package co.quine.osprey.twitter
 package api
 
-import argonaut._
-import Argonaut._
+import argonaut._, Argonaut._
+import scala.concurrent.ExecutionContext
 
 trait Statuses {
   self: TwitterService =>
 
   import Codec._
 
-  def statusesLookup(id: Seq[String]) = {
+  def statusesLookup(id: Seq[String])(implicit ec: ExecutionContext) = {
 
     val params = Seq("id" -> id.mkString(",")).toMap
 
-    Parse.decodeOr[Seq[Tweet], Seq[Tweet]](get(s"$uri/statuses/lookup.json", params).body, _.seq, Seq.empty[Tweet])
+    get(s"$uri/statuses/lookup.json", params) map { r =>
+      Parse.decodeOr[Seq[Tweet], Seq[Tweet]](r.body, _.seq, Seq.empty[Tweet])
+    }
   }
 
-  def statusesShow(id: String) = {
+  def statusesShow(id: String)(implicit ec: ExecutionContext) = {
 
     val params = Seq("id" -> id).toMap
 
-    Parse.decodeOption[Tweet](get(s"$uri/statuses/show.json", params).body)
+    get(s"$uri/statuses/show.json", params).map(r => Parse.decodeOption[Tweet](r.body))
   }
 
   def statusesUserTimeline(userId: Option[Long] = None,
                            screenName: Option[String] = None,
                            sinceId: Option[Long] = None,
                            maxId: Option[Long] = None,
-                           count: Int = 200) = {
+                           count: Int = 200)(implicit ec: ExecutionContext) = {
 
     require(userId.isDefined || screenName.isDefined, "Must specify either user_id or screen_name")
 
@@ -38,9 +40,12 @@ trait Statuses {
       maxId map ("max_id" -> _.toString),
       Some("count" -> count.toString)).flatten.toMap
 
-    Parse.decodeOr[Seq[Tweet], Seq[Tweet]](get(s"$uri/statuses/user_timeline.json", params).body, _.seq, Seq.empty[Tweet])
+    get(s"$uri/statuses/user_timeline.json", params) map { r =>
+      Parse.decodeOr[Seq[Tweet], Seq[Tweet]](r.body, _.seq, Seq.empty[Tweet])
+    }
   }
 
+  /***
   def completeTimeline(userId: Option[Long] = None, screenName: Option[String] = None) = {
 
     require(userId.isDefined || screenName.isDefined, "Must specify either user_id or screen_name")
@@ -59,4 +64,5 @@ trait Statuses {
     }
     recurseTimeline(statusesUserTimeline(userId, screenName))
   }
+    **/
 }
