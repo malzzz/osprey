@@ -13,8 +13,8 @@ trait Statuses {
 
     val params = Seq("id" -> id.mkString(",")).toMap
 
-    get(s"$uri/statuses/lookup.json", params) map { r =>
-      Parse.decodeOr[Seq[Tweet], Seq[Tweet]](r.body, _.seq, Seq.empty[Tweet])
+    get(Resources.StatusesLookup(params)) map { r =>
+      Parse.decodeOr[Seq[Tweet], Seq[Tweet]](r, _.seq, Seq.empty[Tweet])
     }
   }
 
@@ -22,7 +22,7 @@ trait Statuses {
 
     val params = Seq("id" -> id).toMap
 
-    get(s"$uri/statuses/show.json", params).map(r => Parse.decodeOption[Tweet](r.body))
+    get(Resources.StatusesShow(params)).map(r => Parse.decodeOption[Tweet](r))
   }
 
   def statusesUserTimeline(userId: Option[Long] = None,
@@ -40,8 +40,8 @@ trait Statuses {
       maxId map ("max_id" -> _.toString),
       Some("count" -> count.toString)).flatten.toMap
 
-    get(s"$uri/statuses/user_timeline.json", params) map { r =>
-      Parse.decodeOr[Seq[Tweet], Seq[Tweet]](r.body, _.seq, Seq.empty[Tweet])
+    get(Resources.StatusesUserTimeline(params)) map { r =>
+      Parse.decodeOr[Seq[Tweet], Seq[Tweet]](r, _.seq, Seq.empty[Tweet])
     }
   }
 

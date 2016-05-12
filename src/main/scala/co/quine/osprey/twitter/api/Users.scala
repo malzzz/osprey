@@ -17,7 +17,7 @@ trait Users {
       userId map ("user_id" -> _),
       screenName map ("screen_name" -> _)).flatten.toMap
 
-    get(s"$uri/users/show.json", params).map(r => Parse.decodeOption[User](r.body))
+    get(Resources.UsersShow(params)).map(r => Parse.decodeOption[User](r))
   }
 
   def usersLookup(userId: Seq[String] = Seq.empty[String], screenName: Seq[String] = Seq.empty[String])(
@@ -30,6 +30,6 @@ trait Users {
       Some("screen_name" -> screenName.mkString(","))
     ).flatten.toMap
 
-    get(s"$uri/users/lookup.json", params).map(r => Parse.decodeOption[Seq[User]](r.body))
+    get(Resources.UsersLookup(params)).map(r => Parse.decodeOption[Seq[User]](r))
   }
 }
