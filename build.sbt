@@ -34,7 +34,7 @@ lazy val versions = new {
   val redis = "1.6.0"
   val scredis = "2.0.6"
   val spray = "1.3.3"
-  val gatekeeperclient = "0.0.8"
+  val gatekeeperclient = "0.0.9"
 }
 
 libraryDependencies ++= Seq(

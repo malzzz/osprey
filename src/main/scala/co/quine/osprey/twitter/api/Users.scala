@@ -2,14 +2,14 @@ package co.quine.osprey.twitter
 package api
 
 import argonaut._, Argonaut._
-import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait Users {
   self: TwitterService =>
 
   import Codec._
 
-  def usersShow(userId: Option[String] = None, screenName: Option[String] = None)(implicit ec: ExecutionContext) = {
+  def usersShow(userId: Option[String] = None, screenName: Option[String] = None) = {
 
     require(userId.isDefined || screenName.isDefined, "Must specify either user_id or screen_name")
 
@@ -20,8 +20,7 @@ trait Users {
     get(Resources.UsersShow(params)).map(r => Parse.decodeOption[User](r))
   }
 
-  def usersLookup(userId: Seq[String] = Seq.empty[String], screenName: Seq[String] = Seq.empty[String])(
-    implicit ec: ExecutionContext) = {
+  def usersLookup(userId: Seq[String] = Seq.empty[String], screenName: Seq[String] = Seq.empty[String]) = {
 
     require(userId.nonEmpty || screenName.nonEmpty, "Must specify either user_id or screen_name")
 

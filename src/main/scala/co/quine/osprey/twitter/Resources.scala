@@ -1,22 +1,56 @@
 package co.quine.osprey.twitter
 
+import scalaj.http.{Http, HttpRequest, HttpResponse, Token => HttpToken}
 import scala.concurrent.Future
 import co.quine.gatekeeperclient._
-import co.quine.gatekeeperclient.GatekeeperClient.GateReply
+import co.quine.gatekeeperclient.GatekeeperClient._
 import co.quine.osprey.actors.HttpRequestActor._
 
 object Resources {
+
+  implicit class HttpRequests(request: HttpRequest) {
+    def sign(implicit gate: GatekeeperClient) = {
+      println(request.url)
+      val resource = request.url.diff("https://api.twitter.com/1.1")
+      val token = resource match {
+        case "/users/show.json" => gate.usersShow
+        case "/users/lookup.json" => gate.usersLookup
+        case "/statuses/lookup.json" => gate.statusesLookup
+        case "/statuses/show.json" => gate.statusesShow
+        case "/statuses/user_timeline.json" => gate.statusesUserTimeline
+        case "/friends/ids.json" => gate.friendsIds
+        case "/friends/list.json" => gate.friendsList
+        case "/followers/ids.json" => gate.followersIds
+        case "/followers/list.json" => gate.followersList
+      }
+
+      val response: HttpResponse[String] = token match {
+        case AccessToken(k, s) =>
+          val consumer = gate.defaultConsumer
+          request.oauth(HttpToken(consumer.key, consumer.secret), HttpToken(k, s)).asString
+        case BearerToken(k) => request.header("Authorization", s"Bearer $k").asString
+      }
+
+      val remaining = response.header("x-rate-limit-remaining")
+      val reset = response.header("x-rate-limit-reset")
+
+      if (remaining.nonEmpty && reset.nonEmpty) {
+        gate.updateRateLimit(token.key, resource, remaining.get.toInt, reset.get.toLong)
+      }
+      response
+    }
+  }
 
   sealed trait TwitterResource {
     val uri = "https://api.twitter.com/1.1"
     val path: String
     val params: Map[String, String]
 
-    val url = s"$uri$path"
+    def url = s"$uri$path"
 
-    def token(implicit gate: GatekeeperClient): Future[GateReply]
+    def get(implicit gate: GatekeeperClient) = Http(url).sign(gate)
 
-    def get = GetRequest(resource = this)
+    def token(implicit gate: GatekeeperClient): Token
   }
 
   case class UsersShow(params: Map[String, String]) extends TwitterResource {

@@ -6,6 +6,7 @@ import akka.util.Timeout
 import scalaj.http._
 
 import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 import co.quine.osprey._
 import co.quine.osprey.actors._
@@ -20,7 +21,11 @@ trait TwitterService
 
   import HttpRequestActor._
 
-  def get(resource: Resources.TwitterResource) = requests ? GetRequest(resource) collect {
-    case response: HttpResponse[String] => response.body
+  implicit val timeout = Timeout(5.seconds)
+
+  def get(resource: Resources.TwitterResource) = {
+    requests ? GetRequest(resource) collect {
+      case response: HttpResponse[String] => response.body
+    }
   }
 }
