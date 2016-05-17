@@ -9,15 +9,15 @@ trait Users {
 
   import Codec._
 
-  def usersShow(userId: Option[String] = None, screenName: Option[String] = None) = {
+  def usersShow(userId: Option[Long] = None, screenName: Option[String] = None) = {
 
     require(userId.isDefined || screenName.isDefined, "Must specify either user_id or screen_name")
 
     val params = Seq(
-      userId map ("user_id" -> _),
+      userId map ("user_id" -> _.toString),
       screenName map ("screen_name" -> _)).flatten.toMap
 
-    get(Resources.UsersShow(params)).map(r => Parse.decodeOption[User](r))
+    get(Resources.UsersShow(params)).map(r => Parse.decodeOption[User](r.body))
   }
 
   def usersLookup(userId: Seq[String] = Seq.empty[String], screenName: Seq[String] = Seq.empty[String]) = {
@@ -29,6 +29,6 @@ trait Users {
       Some("screen_name" -> screenName.mkString(","))
     ).flatten.toMap
 
-    get(Resources.UsersLookup(params)).map(r => Parse.decodeOption[Seq[User]](r))
+    get(Resources.UsersLookup(params)).map(r => Parse.decodeOption[Seq[User]](r.body))
   }
 }

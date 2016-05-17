@@ -19,7 +19,7 @@ trait Followers {
       userId map ("user_id" -> _),
       screenName map ("screen_name" -> _.toString)).flatten.toMap
 
-    get(Resources.FollowersList(params)).map(r => Parse.decodeOption[UserList](r))
+    get(Resources.FollowersList(params)).map(r => Parse.decodeOption[UserList](r.body))
   }
 
   def followersIds(userId: Option[String] = None,
@@ -31,6 +31,6 @@ trait Followers {
       userId map ("user_id" -> _),
       screenName map ("screen_name" -> _.toString)).flatten.toMap
 
-    get(Resources.FollowersIds(params)).map(r => Parse.decodeOption[UserIds](r))
+    get(Resources.FollowersIds(params)).map(r => Parse.decodeOption[UserIds](r.body))
   }
 }

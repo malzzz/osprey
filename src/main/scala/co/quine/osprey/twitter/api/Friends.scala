@@ -19,7 +19,7 @@ trait Friends {
       userId map ("user_id" -> _),
       screenName map ("screen_name" -> _.toString)).flatten.toMap
 
-    get(Resources.FriendsList(params)).map(r => Parse.decodeOption[UserList](r))
+    get(Resources.FriendsList(params)).map(r => Parse.decodeOption[UserList](r.body))
   }
 
   def friendsIds(userId: Option[String] = None,
@@ -31,6 +31,6 @@ trait Friends {
       userId map ("user_id" -> _),
       screenName map ("screen_name" -> _.toString)).flatten.toMap
 
-    get(Resources.FriendsIds(params)).map(r => Parse.decodeOption[UserIds](r))
+    get(Resources.FriendsIds(params)).map(r => Parse.decodeOption[UserIds](r.body))
   }
 }

@@ -10,7 +10,7 @@ import co.quine.gatekeeperclient._
 import co.quine.osprey.twitter.Resources._
 
 object HttpRequestActor {
-  case class GetRequest(resource: TwitterResource)
+  case class GetRequest(resource: TwitterResource, promise: Promise[HttpResponse[String]])
 
   def props = Props(new HttpRequestActor())
 }
@@ -27,7 +27,9 @@ class HttpRequestActor extends Actor with ActorLogging {
   }
 
   def receive = {
-    case GetRequest(resource) => sender() ! get(resource)
+    case GetRequest(resource, promise) =>
+      val response = get(resource)
+      promise.success(response)
   }
 
   def get(resource: TwitterResource): HttpResponse[String] = {

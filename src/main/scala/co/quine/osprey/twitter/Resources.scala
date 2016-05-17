@@ -1,10 +1,8 @@
 package co.quine.osprey.twitter
 
 import scalaj.http.{Http, HttpRequest, HttpResponse, Token => HttpToken}
-import scala.concurrent.Future
 import co.quine.gatekeeperclient._
 import co.quine.gatekeeperclient.GatekeeperClient._
-import co.quine.osprey.actors.HttpRequestActor._
 
 object Resources {
 

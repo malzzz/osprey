@@ -26,7 +26,10 @@ object Codec {
 
   case class Tweet(coordinates: Option[Coordinates],
                    created_at: String,
-                   entities: Option[Entities],
+                   mentions: Option[Seq[Long]],
+                   hashtags: Option[Seq[String]],
+                   media: Option[Seq[Media]],
+                   urls: Option[Seq[String]],
                    favorite_count: Int,
                    id: Long,
                    in_reply_to_status_id: Option[Long],
@@ -58,54 +61,96 @@ object Codec {
 
   case class UserList(previous_cursor: Long, next_cursor: Long, users: Seq[User])
 
-  implicit def UserDecodeJson: DecodeJson[User] = {
-    DecodeJson(c => for {
-      created_at <- (c --\ "created_at").as[String]
-      description <- (c --\ "description").as[Option[String]]
-      favourites_count <- (c --\ "favourites_count").as[Int]
-      followers_count <- (c --\ "followers_count").as[Int]
-      friends_count <- (c --\ "friends_count").as[Int]
-      geo_enabled <- (c --\ "geo_enabled").as[Boolean]
-      id <- (c --\ "id").as[Long]
-      listed_count <- (c --\ "listed_count").as[Int]
-      location <- (c --\ "location").as[Option[String]]
-      name <- (c --\ "name").as[Option[String]]
-      profile_banner_url <- (c --\ "profile_banner_url").as[String]
-      profile_image_url <- (c --\ "profile_image_url").as[String]
-      protekted <- (c --\ "protected").as[Boolean]
-      screen_name <- (c --\ "screen_name").as[String]
-      status <- (c --\ "status").as[Option[Tweet]]
-      statuses_count <- (c --\ "statuses_count").as[Int]
-      time_zone <- (c --\ "time_zone").as[Option[String]]
-      url <- (c --\ "url").as[Option[String]]
-      verified <- (c --\ "verified").as[Boolean]
-    } yield User(
-        created_at,
-        description,
-        favourites_count,
-        followers_count,
-        friends_count,
-        geo_enabled,
-        id,
-        listed_count,
-        location,
-        name,
-        profile_banner_url,
-        profile_image_url,
-        protekted,
-        screen_name,
-        status,
-        statuses_count,
-        time_zone,
-        url,
-        verified))
-  }
+  implicit def UserCodecJson: CodecJson[User] =
+    CodecJson(
+      (u: User) =>
+        ("created_at" := u.created_at) ->:
+        ("description" := u.description) ->:
+        ("favourites_count" := u.favourites_count) ->:
+        ("followers_count" := u.followers_count) ->:
+        ("friends_count" := u.friends_count) ->:
+        ("geo_enabled" := u.geo_enabled) ->:
+        ("id" := u.id) ->:
+        ("listed_count" := u.listed_count) ->:
+        ("location" := u.location) ->:
+        ("name" := u.name) ->:
+        ("profile_banner_url" := u.profile_banner_url) ->:
+        ("profile_image_url" := u.profile_image_url) ->:
+        ("protected" := u.protekted) ->:
+        ("screen_name" := u.screen_name) ->:
+        ("status" := u.status) ->:
+        ("statuses_count" := u.statuses_count) ->:
+        ("time_zone" := u.time_zone) ->:
+        ("url" := u.url) ->:
+        ("verified" := u.verified) ->:
+        jEmptyObject,
+      c => for {
+        created_at <- (c --\ "created_at").as[String]
+        description <- (c --\ "description").as[Option[String]]
+        favourites_count <- (c --\ "favourites_count").as[Int]
+        followers_count <- (c --\ "followers_count").as[Int]
+        friends_count <- (c --\ "friends_count").as[Int]
+        geo_enabled <- (c --\ "geo_enabled").as[Boolean]
+        id <- (c --\ "id").as[Long]
+        listed_count <- (c --\ "listed_count").as[Int]
+        location <- (c --\ "location").as[Option[String]]
+        name <- (c --\ "name").as[Option[String]]
+        profile_banner_url <- (c --\ "profile_banner_url").as[String]
+        profile_image_url <- (c --\ "profile_image_url").as[String]
+        protekted <- (c --\ "protected").as[Boolean]
+        screen_name <- (c --\ "screen_name").as[String]
+        status <- (c --\ "status").as[Option[Tweet]]
+        statuses_count <- (c --\ "statuses_count").as[Int]
+        time_zone <- (c --\ "time_zone").as[Option[String]]
+        url <- (c --\ "url").as[Option[String]]
+        verified <- (c --\ "verified").as[Boolean]
+      } yield User(
+          created_at,
+          description,
+          favourites_count,
+          followers_count,
+          friends_count,
+          geo_enabled,
+          id,
+          listed_count,
+          location,
+          name,
+          profile_banner_url,
+          profile_image_url,
+          protekted,
+          screen_name,
+          status,
+          statuses_count,
+          time_zone,
+          url,
+          verified))
 
-  implicit def TweetDecodeJson: DecodeJson[Tweet] = {
-    DecodeJson(c => for {
+  implicit def TweetCodecJson: CodecJson[Tweet] =
+    CodecJson(
+      (t: Tweet) =>
+        ("coordinates" := t.coordinates.map(x => Seq(x.longitude, x.latitude))) ->:
+        ("created_at" := t.created_at) ->:
+        ("hashtags" := t.hashtags) ->:
+        ("mentions" := t.mentions) ->:
+        ("media" := t.media) ->:
+        ("urls" := t.urls) ->:
+        ("favorite_count" := t.favorite_count) ->:
+        ("id" := t.id) ->:
+        ("in_reply_to_status_id" := t.in_reply_to_status_id) ->:
+        ("in_reply_to_user_id" := t.in_reply_to_user_id) ->:
+        ("quoted_status_id" := t.quoted_status_id) ->:
+        ("retweet_count" := t.retweet_count) ->:
+        ("retweeted_status" := t.retweeted_status) ->:
+        ("text" := t.text) ->:
+        ("user" := t.user) ->:
+        jEmptyObject,
+      c => for {
       coordinates <- (c --\ "coordinates").as[Option[Coordinates]]
       created_at <- (c --\ "created_at").as[String]
-      entities <- (c --\ "entities").as[Option[Entities]]
+      hashtags <- (c --\ "entities" --\ "hashtags").as[Option[Seq[Hashtag]]]
+      mentions <- (c --\ "entities" --\ "user_mentions").as[Option[Seq[Mention]]]
+      media <- (c --\ "entities" --\ "media").as[Option[Seq[Media]]]
+      urls <- (c --\ "entities" --\ "urls").as[Option[Seq[Url]]]
       favorite_count <- (c --\ "favorite_count").as[Int]
       id <- (c --\ "id").as[Long]
       in_reply_to_status_id <- (c --\ "in_reply_to_status_id").as[Option[Long]]
@@ -118,7 +163,10 @@ object Codec {
     } yield Tweet(
         coordinates,
         created_at,
-        entities,
+        mentions.map(allMentions => allMentions.map(m => m.id)),
+        hashtags.map(allHashtags => allHashtags.map(h => h.text)),
+        media,
+        urls.map(allUrls => allUrls.map(u => u.expanded_url)),
         favorite_count,
         id,
         in_reply_to_status_id,
@@ -128,13 +176,12 @@ object Codec {
         retweeted_status,
         text,
         user))
-  }
 
-  implicit def CoordinatesDecodeJson: DecodeJson[Coordinates] = {
+  implicit def CoordinatesDecodeJson: DecodeJson[Coordinates] =
     DecodeJson(c => for {
       longlat <- (c --\ "coordinates").as[Seq[Double]]
     } yield longlat match { case Seq(long, lat) => Coordinates(long, lat) })
-  }
+
 
   implicit def EntitiesDecodeJson: DecodeJson[Entities] = {
     DecodeJson(c => for {
@@ -152,13 +199,18 @@ object Codec {
     } yield Hashtag(indices, text))
   }
 
-  implicit def MediaDecodeJson: DecodeJson[Media] = {
-    DecodeJson(c => for {
-      expanded_url <- (c --\ "expanded_url").as[String]
-      source_status_id <- (c --\ "source_status_id").as[Option[Long]]
-      mType <- (c --\ "type").as[String]
-    } yield Media(expanded_url, source_status_id, mType))
-  }
+  implicit def MediaCodecJson: CodecJson[Media] =
+    CodecJson(
+      (m: Media) =>
+        ("expanded_url" := m.expanded_url) ->:
+        ("source_status_id" := m.source_status_id) ->:
+        ("type" := m.mType) ->:
+        jEmptyObject,
+      c => for {
+        expanded_url <- (c --\ "expanded_url").as[String]
+        source_status_id <- (c --\ "source_status_id").as[Option[Long]]
+        mType <- (c --\ "type").as[String]
+      } yield Media(expanded_url, source_status_id, mType))
 
   implicit def UrlDecodeJson: DecodeJson[Url] = {
     DecodeJson(c => for {
