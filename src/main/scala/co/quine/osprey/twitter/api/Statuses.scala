@@ -2,9 +2,8 @@ package co.quine.osprey.twitter
 package api
 
 import argonaut._, Argonaut._
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 
 trait Statuses {
   self: TwitterService =>
@@ -47,32 +46,33 @@ trait Statuses {
     }
   }
 
-  def userTimeline(userId: Option[Long] = None, screenName: Option[String] = None) = {
+  def userTimeline(userId: Option[Long] = None, screenName: Option[String] = None, maxLength: Int = 3200) = {
 
     require(userId.isDefined || screenName.isDefined, "Must specify either user_id or screen_name")
 
-    val maxLength = 3200
-
-    var calls = 0
-
-    val callTimeline: Option[Long] => Future[Seq[Tweet]] = {
-      calls += 1
-      statusesUserTimeline(userId, screenName, None, _: Option[Long])
-    }
+    val callTimeline: (Option[Long], Int) => Future[Seq[Tweet]] =
+      statusesUserTimeline(userId, screenName, None, _: Option[Long], _: Int)
 
     def recurseTimeline(t: Seq[Tweet]): Future[Seq[Tweet]] = {
-      val statusesCount = t.head.user.map(user => user.statuses_count).getOrElse(0)
-      println(s"Statuses: $statusesCount, length: ${t.length}")
+      val statusesCount = {
+        val userStatuses = t.head.user.map(user => user.statuses_count).getOrElse(0)
+        if (userStatuses > maxLength) maxLength else userStatuses
+      }
+
+      val countDifference = {
+        val absDiff = statusesCount - t.length
+        if (absDiff < 200) absDiff else 200
+      }
 
       if (t.length < statusesCount && t.length < maxLength && statusesCount > 0) {
-        val maxId = t.map(tweets => tweets.id).min
+        val maxId = t.map(tweets => tweets.id).min - 1
 
         for {
-          nextTimeline <- callTimeline(Some(maxId))
+          nextTimeline <- callTimeline(Some(maxId), countDifference)
           completeTimeline <- recurseTimeline(t ++ nextTimeline)
         } yield completeTimeline
       } else Future.successful(t)
     }
-    callTimeline(None).flatMap(recurseTimeline)
+    callTimeline(None, 200).flatMap(recurseTimeline)
   }
 }

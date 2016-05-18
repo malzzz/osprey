@@ -11,5 +11,4 @@ class Osprey extends TwitterService {
 
   val requests = system.actorOf(HttpRequestActor.props, "http-requests")
 
-
 }

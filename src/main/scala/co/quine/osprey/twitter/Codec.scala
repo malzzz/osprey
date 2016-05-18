@@ -61,6 +61,8 @@ object Codec {
 
   case class UserList(previous_cursor: Long, next_cursor: Long, users: Seq[User])
 
+  case class UserTimeline(statuses: Seq[Tweet])
+
   implicit def UserCodecJson: CodecJson[User] =
     CodecJson(
       (u: User) =>
