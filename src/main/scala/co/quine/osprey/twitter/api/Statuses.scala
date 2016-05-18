@@ -47,25 +47,32 @@ trait Statuses {
     }
   }
 
-  def completeTimeline(userId: Option[Long] = None, screenName: Option[String] = None) = {
+  def userTimeline(userId: Option[Long] = None, screenName: Option[String] = None) = {
 
     require(userId.isDefined || screenName.isDefined, "Must specify either user_id or screen_name")
 
-    val maxTweets = 3200
+    val maxLength = 3200
 
-    def getTimeline(userId: Option[Long] = None, screenName: Option[String] = None, maxId: Option[Long] = None) = {
-      val timeline = statusesUserTimeline(userId = userId, screenName = screenName, maxId = maxId)
-      Await.result(timeline, 5.seconds)
+    var calls = 0
+
+    val callTimeline: Option[Long] => Future[Seq[Tweet]] = {
+      calls += 1
+      statusesUserTimeline(userId, screenName, None, _: Option[Long])
     }
 
-    def recurseTimeline(timeline: Seq[Tweet]): Seq[Tweet] = {
-      if (timeline.length < maxTweets && timeline.length < timeline.head.user.map(u => u.statuses_count).getOrElse(0)) {
-        val maxId = timeline.min(Ordering.by((t: Tweet) => t.id)).id - 1
-        val nextTimeline = getTimeline(userId = userId, screenName = screenName, maxId = Some(maxId))
-        val newTimeline = timeline ++ nextTimeline
-        recurseTimeline(newTimeline)
-      } else timeline.distinct
+    def recurseTimeline(t: Seq[Tweet]): Future[Seq[Tweet]] = {
+      val statusesCount = t.head.user.map(user => user.statuses_count).getOrElse(0)
+      println(s"Statuses: $statusesCount, length: ${t.length}")
+
+      if (t.length < statusesCount && t.length < maxLength && statusesCount > 0) {
+        val maxId = t.map(tweets => tweets.id).min
+
+        for {
+          nextTimeline <- callTimeline(Some(maxId))
+          completeTimeline <- recurseTimeline(t ++ nextTimeline)
+        } yield completeTimeline
+      } else Future.successful(t)
     }
-    recurseTimeline(getTimeline(userId, screenName))
+    callTimeline(None).flatMap(recurseTimeline)
   }
 }
