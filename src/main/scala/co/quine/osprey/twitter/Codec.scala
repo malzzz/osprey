@@ -1,6 +1,8 @@
 package co.quine.osprey.twitter
 
 import argonaut._, Argonaut._
+import monocle._, Monocle._
+import co.quine.gatekeeperclient.GatekeeperClient.Unavailable
 
 object Codec {
 
@@ -24,12 +26,12 @@ object Codec {
                   url: Option[String],
                   verified: Boolean)
 
-  case class Tweet(coordinates: Option[Coordinates],
+  case class Tweet(coordinates: Option[Point],
                    created_at: String,
-                   mentions: Option[Seq[Long]],
-                   hashtags: Option[Seq[String]],
-                   media: Option[Seq[Media]],
-                   urls: Option[Seq[String]],
+                   mentions: List[Long],
+                   hashtags: List[String],
+                   media: List[Media],
+                   urls: List[String],
                    favorite_count: Int,
                    id: Long,
                    in_reply_to_status_id: Option[Long],
@@ -40,28 +42,22 @@ object Codec {
                    text: String,
                    user: Option[User])
 
-  case class Coordinates(longitude: Double, latitude: Double)
-
-  case class Entities(hashtags: Option[Seq[Hashtag]],
-                      media: Option[Seq[Media]],
-                      urls: Option[Seq[Url]],
-                      user_mentions: Option[Seq[Mention]])
-
-  case class Hashtag(indices: Seq[Int], text: String)
+  case class Point(longitude: Double, latitude: Double)
 
   case class Media(expanded_url: String,
                    source_status_id: Option[Long],
                    mType: String)
-
-  case class Url(expanded_url: String)
-
-  case class Mention(name: String, id: Long)
 
   case class UserIds(previous_cursor: Long, ids: Seq[Long], next_cursor: Long)
 
   case class UserList(previous_cursor: Long, next_cursor: Long, users: Seq[User])
 
   case class UserTimeline(statuses: Seq[Tweet])
+
+  implicit def UnavailableDecodeJson: DecodeJson[Unavailable] =
+    DecodeJson(c => for {
+      ttl <- (c --\ "rate_limit").as[Long]
+    } yield Unavailable(ttl))
 
   implicit def UserCodecJson: CodecJson[User] =
     CodecJson(
@@ -127,7 +123,32 @@ object Codec {
           url,
           verified))
 
-  implicit def TweetCodecJson: CodecJson[Tweet] =
+  implicit def TweetCodecJson: CodecJson[Tweet] = {
+
+    val hashtagLens = jObjectPrism
+      .composeOptional(index("hashtags"))
+      .composePrism(jArrayPrism)
+      .composeTraversal(each[List[Json], Json])
+      .composePrism(jObjectPrism)
+      .composeOptional(index("text"))
+      .composePrism(jStringPrism)
+
+    val mentionLens = jObjectPrism
+      .composeOptional(index("user_mentions"))
+      .composePrism(jArrayPrism)
+      .composeTraversal(each[List[Json], Json])
+      .composePrism(jObjectPrism)
+      .composeOptional(index("id"))
+      .composePrism(jLongPrism)
+
+    val urlLens = jObjectPrism
+      .composeOptional(index("urls"))
+      .composePrism(jArrayPrism)
+      .composeTraversal(each[List[Json], Json])
+      .composePrism(jObjectPrism)
+      .composeOptional(index("expanded_url"))
+      .composePrism(jStringPrism)
+
     CodecJson(
       (t: Tweet) =>
         ("coordinates" := t.coordinates.map(x => Seq(x.longitude, x.latitude))) ->:
@@ -147,28 +168,26 @@ object Codec {
         ("user" := t.user) ->:
         jEmptyObject,
       c => for {
-      coordinates <- (c --\ "coordinates").as[Option[Coordinates]]
-      created_at <- (c --\ "created_at").as[String]
-      hashtags <- (c --\ "entities" --\ "hashtags").as[Option[Seq[Hashtag]]]
-      mentions <- (c --\ "entities" --\ "user_mentions").as[Option[Seq[Mention]]]
-      media <- (c --\ "entities" --\ "media").as[Option[Seq[Media]]]
-      urls <- (c --\ "entities" --\ "urls").as[Option[Seq[Url]]]
-      favorite_count <- (c --\ "favorite_count").as[Int]
-      id <- (c --\ "id").as[Long]
-      in_reply_to_status_id <- (c --\ "in_reply_to_status_id").as[Option[Long]]
-      in_reply_to_user_id <- (c --\ "in_reply_to_user_id").as[Option[Long]]
-      quoted_status_id <- (c --\ "quoted_status_id").as[Option[Long]]
-      retweet_count <- (c --\ "retweet_count").as[Int]
-      retweeted_status <- (c --\ "retweeted_status").as[Option[Tweet]]
-      text <- (c --\ "text").as[String]
-      user <- (c --\ "user").as[Option[User]]
-    } yield Tweet(
+        coordinates <- (c --\ "coordinates").as[Option[Point]]
+        created_at <- (c --\ "created_at").as[String]
+        entities <- (c --\ "entities").as[Json]
+        media <- (c --\ "entities" --\ "media").as[Option[List[Media]]]
+        favorite_count <- (c --\ "favorite_count").as[Int]
+        id <- (c --\ "id").as[Long]
+        in_reply_to_status_id <- (c --\ "in_reply_to_status_id").as[Option[Long]]
+        in_reply_to_user_id <- (c --\ "in_reply_to_user_id").as[Option[Long]]
+        quoted_status_id <- (c --\ "quoted_status_id").as[Option[Long]]
+        retweet_count <- (c --\ "retweet_count").as[Int]
+        retweeted_status <- (c --\ "retweeted_status").as[Option[Tweet]]
+        text <- (c --\ "text").as[String]
+        user <- (c --\ "user").as[Option[User]]
+      } yield Tweet(
         coordinates,
         created_at,
-        mentions.map(allMentions => allMentions.map(m => m.id)),
-        hashtags.map(allHashtags => allHashtags.map(h => h.text)),
-        media,
-        urls.map(allUrls => allUrls.map(u => u.expanded_url)),
+        mentionLens.getAll(entities),
+        hashtagLens.getAll(entities),
+        media.getOrElse(List.empty[Media]),
+        urlLens.getAll(entities),
         favorite_count,
         id,
         in_reply_to_status_id,
@@ -178,28 +197,12 @@ object Codec {
         retweeted_status,
         text,
         user))
+  }
 
-  implicit def CoordinatesDecodeJson: DecodeJson[Coordinates] =
+  implicit def PointDecodeJson: DecodeJson[Point] =
     DecodeJson(c => for {
       longlat <- (c --\ "coordinates").as[Seq[Double]]
-    } yield longlat match { case Seq(long, lat) => Coordinates(long, lat) })
-
-
-  implicit def EntitiesDecodeJson: DecodeJson[Entities] = {
-    DecodeJson(c => for {
-      hashtags <- (c --\ "hashtags").as[Option[Seq[Hashtag]]]
-      media <- (c --\ "media").as[Option[Seq[Media]]]
-      urls <- (c --\ "urls").as[Option[Seq[Url]]]
-      user_mentions <- (c --\ "user_mentions").as[Option[Seq[Mention]]]
-    } yield Entities(hashtags, media, urls, user_mentions))
-  }
-
-  implicit def HashtagDecodeJson: DecodeJson[Hashtag] = {
-    DecodeJson(c => for {
-      indices <- (c --\ "indices").as[Seq[Int]]
-      text <- (c --\ "text").as[String]
-    } yield Hashtag(indices, text))
-  }
+    } yield longlat match { case Seq(long, lat) => Point(long, lat) })
 
   implicit def MediaCodecJson: CodecJson[Media] =
     CodecJson(
@@ -213,19 +216,6 @@ object Codec {
         source_status_id <- (c --\ "source_status_id").as[Option[Long]]
         mType <- (c --\ "type").as[String]
       } yield Media(expanded_url, source_status_id, mType))
-
-  implicit def UrlDecodeJson: DecodeJson[Url] = {
-    DecodeJson(c => for {
-      expanded_url <- (c --\ "expanded_url").as[String]
-    } yield Url(expanded_url))
-  }
-
-  implicit def MentionDecodeJson: DecodeJson[Mention] = {
-    DecodeJson(c => for {
-      name <- (c --\ "name").as[String]
-      id <- (c --\ "id").as[Long]
-    } yield Mention(name, id))
-  }
 
   implicit def UserIdsDecodeJson: DecodeJson[UserIds] = {
     DecodeJson(c => for {

@@ -8,7 +8,6 @@ object Resources {
 
   implicit class HttpRequests(request: HttpRequest) {
     def sign(implicit gate: GatekeeperClient) = {
-      println(request.url)
       val resource = request.url.diff("https://api.twitter.com/1.1")
       val token = resource match {
         case "/users/show.json" => gate.usersShow
@@ -27,17 +26,33 @@ object Resources {
           val consumer = gate.defaultConsumer
           request.oauth(HttpToken(consumer.key, consumer.secret), HttpToken(k, s)).asString
         case BearerToken(k) => request.header("Authorization", s"Bearer $k").asString
+        case Unavailable(ttl) =>
+          HttpResponse[String](s"""{"rate_limit": $ttl}""", 430, Map("TTL" -> IndexedSeq(ttl.toString)))
       }
 
-      val remaining = response.header("x-rate-limit-remaining")
-      val reset = response.header("x-rate-limit-reset")
+      if (response.is2xx) {
+        val remaining = response.header("x-rate-limit-remaining")
+        val reset = response.header("x-rate-limit-reset")
 
-      if (remaining.nonEmpty && reset.nonEmpty) {
-        gate.updateRateLimit(token.key, resource, remaining.get.toInt, reset.get.toLong)
+        if (remaining.nonEmpty && reset.nonEmpty) {
+          gate.updateRateLimit(token.key, resource, remaining.get.toInt, reset.get.toLong)
+        }
       }
       response
     }
   }
+
+  sealed trait Error
+  case object BadRequest extends Error
+  case object Unauthorized extends Error
+  case object Forbidden extends Error
+  case object NotFound extends Error
+  case object NotAcceptable extends Error
+  case object TooManyRequests extends Error
+  case object InternalServerError extends Error
+  case object BadGateway extends Error
+  case object ServiceUnavailable extends Error
+  case object GatewayTimeout extends Error
 
   sealed trait TwitterResource {
     val uri = "https://api.twitter.com/1.1"

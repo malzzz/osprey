@@ -2,12 +2,14 @@ package co.quine.osprey.twitter
 package api
 
 import argonaut._, Argonaut._
+import scalaz._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 trait Users {
   self: TwitterService =>
 
   import Codec._
+  import Resources._
 
   def usersShow(userId: Option[Long] = None, screenName: Option[String] = None) = {
 
@@ -17,7 +19,10 @@ trait Users {
       userId map ("user_id" -> _.toString),
       screenName map ("screen_name" -> _)).flatten.toMap
 
-    get(Resources.UsersShow(params)).map(r => Parse.decodeOption[User](r.body))
+    val futureResponse = get(Resources.UsersShow(params))
+
+    onResponse(futureResponse).map(response => response.map(user => Parse.decodeOption[User](user)))
+
   }
 
   def usersLookup(userId: Seq[String] = Seq.empty[String], screenName: Seq[String] = Seq.empty[String]) = {
