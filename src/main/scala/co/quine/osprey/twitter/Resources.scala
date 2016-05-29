@@ -1,9 +1,9 @@
 package co.quine.osprey.twitter
 
-import argonaut._, Argonaut._
 import scalaj.http.{Http, HttpRequest, HttpResponse, Token => HttpToken}
-import co.quine.gatekeeperclient._
+
 import co.quine.gatekeeperclient.GatekeeperClient._
+import co.quine.gatekeeperclient._
 
 object Resources {
 
