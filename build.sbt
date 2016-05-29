@@ -2,7 +2,7 @@ name := "osprey"
 
 organization := "co.quine"
 
-version := "0.0.1"
+version := "0.1.0"
 
 scalaVersion := "2.11.8"
 
@@ -27,23 +27,20 @@ lazy val versions = new {
   val akka = "2.4.3"
   val nscalatime = "2.12.0"
   val config = "1.3.0"
-  val scalalogging = "3.1.0"
   val gatekeeperclient = "0.0.9"
+  val scalaz = "7.1.8"
+  val argonaut = "6.1"
+  val scalajhttp = "2.3.0"
 }
 
 libraryDependencies ++= Seq(
   "co.quine"                    %% "gatekeeper-client" % versions.gatekeeperclient changing(),
   "com.github.nscala-time"      %% "nscala-time" % versions.nscalatime,
   "com.typesafe"                 % "config" % versions.config,
-  "com.typesafe.scala-logging"  %% "scala-logging" % versions.scalalogging,
   "com.typesafe.akka"           %% "akka-actor" % versions.akka,
-  "com.typesafe.akka"           %% "akka-slf4j" % versions.akka,
-  "ch.qos.logback"               % "logback-classic" % "1.1.3",
-  "commons-codec"                % "commons-codec" % "1.10",
-  "org.parboiled"                % "parboiled-core" % "1.1.7",
-  "org.scalaj"                  %% "scalaj-http" % "2.3.0",
-  "io.argonaut"                 %% "argonaut" % "6.1",
-  "org.scalaz"                  %% "scalaz-core" % "7.1.8"
+  "org.scalaj"                  %% "scalaj-http" % versions.scalajhttp,
+  "io.argonaut"                 %% "argonaut" % versions.argonaut,
+  "org.scalaz"                  %% "scalaz-core" % versions.scalaz
 )
 
 evictionWarningOptions in update := EvictionWarningOptions.default

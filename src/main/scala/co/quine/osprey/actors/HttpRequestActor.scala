@@ -1,23 +1,17 @@
-package co.quine.osprey.actors
+package co.quine.osprey
+package actors
 
 import akka.actor._
 import scalaj.http._
 import scalaj.http.{Token => HttpToken}
-import scala.concurrent.{Await, Future, Promise}
-import scala.concurrent.duration._
-import scala.util.{Success, Failure}
 import co.quine.gatekeeperclient._
 import co.quine.osprey.twitter.Resources._
 
 object HttpRequestActor {
-  case class GetRequest(resource: TwitterResource, promise: Promise[HttpResponse[String]])
-
   def props = Props(new HttpRequestActor())
 }
 
 class HttpRequestActor extends Actor with ActorLogging {
-
-  import HttpRequestActor._
 
   implicit val gatekeeper = GatekeeperClient(Some(context.system))
 
@@ -26,10 +20,13 @@ class HttpRequestActor extends Actor with ActorLogging {
     HttpToken(token.key, token.secret)
   }
 
+  override def preStart() = {
+    log.info(s"${self.path.name}: Ready")
+  }
+
   def receive = {
-    case GetRequest(resource, promise) =>
-      val response = get(resource)
-      promise.success(response)
+    case r: TwitterResource =>
+      sender ! get(r)
   }
 
   def get(resource: TwitterResource): HttpResponse[String] = {

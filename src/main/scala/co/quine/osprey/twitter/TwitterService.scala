@@ -1,32 +1,20 @@
 package co.quine.osprey.twitter
 
-import akka.actor._
-import argonaut._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scalaj.http._
 import scalaz._
-import scala.concurrent.{Future, Promise}
-import scala.concurrent.ExecutionContext.Implicits.global
+
+import argonaut._
+
 import co.quine.gatekeeperclient.GatekeeperClient.Unavailable
-import co.quine.osprey._
-import co.quine.osprey.actors._
-import co.quine.osprey.twitter.api._
 
-trait TwitterService
-  extends Followers
-    with Friends
-    with Statuses
-    with Users {
-  self: Osprey =>
+trait TwitterService extends Api {
 
-  import HttpRequestActor._
   import Codec._
   import Resources._
 
-  def get(resource: Resources.TwitterResource) = {
-    val promise = Promise[HttpResponse[String]]()
-    requests ! GetRequest(resource, promise)
-    promise.future
-  }
+  def get(resource: TwitterResource): Future[HttpResponse[String]]
 
   def onResponse(futureResponse: Future[HttpResponse[String]]): Future[Unavailable \/ String] = {
     val response: Future[Unavailable \/ String] = futureResponse map {
@@ -37,18 +25,17 @@ trait TwitterService
     response
   }
 
-  def usersIds(resource: TwitterResource,
-               all: Boolean = false) = {
+  def usersIds(resource: TwitterResource, all: Boolean = false): Future[UserIds] = {
 
     require(resource.isInstanceOf[FriendsIds] || resource.isInstanceOf[FollowersIds], "Invalid resource provided")
 
-    def callIds = get(resource) map { r =>
+    def callIds: Future[UserIds] = get(resource) map { r =>
       Parse.decodeOption[UserIds](r.body).getOrElse(UserIds(0, Seq.empty[Long], 0))
     }
 
     def resourceWithCursor(cursor: Long) = resource match {
-      case r: FriendsIds => r.copy(params = resource.params + ("cursor" -> cursor.toString))
-      case r: FollowersIds => r.copy(params = resource.params + ("cursor" -> cursor.toString))
+      case r: FriendsIds => r.copy(cursor = Some(cursor))
+      case r: FollowersIds => r.copy(cursor = Some(cursor))
     }
 
     def recurseIds(collection: UserIds): Future[UserIds] = {
@@ -68,4 +55,33 @@ trait TwitterService
     }
   }
 
+  def userTimeline(resource: StatusesUserTimeline, maxLength: Int = 3200): Future[Seq[Tweet]] = {
+
+    def callTimeline(maxId: Option[Long], count: Int = 200) = {
+      val r = resource.copy(maxId = maxId, count = count)
+      get(r).map(result => Parse.decodeOr[Seq[Tweet], Seq[Tweet]](result.body, _.seq, Seq.empty[Tweet]))
+    }
+
+    def recurseTimeline(t: Seq[Tweet]): Future[Seq[Tweet]] = {
+      val statusesCount = {
+        val userStatuses = t.head.user.map(user => user.statuses_count).getOrElse(0)
+        if (userStatuses > maxLength) maxLength else userStatuses
+      }
+
+      val countDifference = {
+        val absDiff = statusesCount - t.length
+        if (absDiff < 200) absDiff else 200
+      }
+
+      if (t.length < statusesCount && t.length < maxLength && statusesCount > 0) {
+        val maxId = t.map(tweets => tweets.id).min - 1
+
+        for {
+          nextTimeline <- callTimeline(Some(maxId), countDifference)
+          completeTimeline <- recurseTimeline(t ++ nextTimeline)
+        } yield completeTimeline
+      } else Future.successful(t)
+    }
+    if (maxLength >= 200) callTimeline(None, 200).flatMap(recurseTimeline) else callTimeline(None, maxLength)
+  }
 }

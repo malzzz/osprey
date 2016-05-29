@@ -1,10 +1,17 @@
-package co.quine.osprey.twitter
+package co.quine.osprey
+package twitter
 
-import argonaut._, Argonaut._
-import monocle._, Monocle._
+import argonaut.Argonaut._
+import argonaut._
+import monocle.Monocle._
+
 import co.quine.gatekeeperclient.GatekeeperClient.Unavailable
 
 object Codec {
+
+  import actors.ResponseObject
+
+  sealed trait TwitterObject extends ResponseObject
 
   case class User(created_at: String,
                   description: Option[String],
@@ -24,7 +31,7 @@ object Codec {
                   statuses_count: Int,
                   time_zone: Option[String],
                   url: Option[String],
-                  verified: Boolean)
+                  verified: Boolean) extends TwitterObject
 
   case class Tweet(coordinates: Option[Point],
                    created_at: String,
@@ -40,19 +47,19 @@ object Codec {
                    retweet_count: Int,
                    retweeted_status: Option[Tweet],
                    text: String,
-                   user: Option[User])
+                   user: Option[User]) extends TwitterObject
 
-  case class Point(longitude: Double, latitude: Double)
+  case class Point(longitude: Double, latitude: Double) extends TwitterObject
 
   case class Media(expanded_url: String,
                    source_status_id: Option[Long],
-                   mType: String)
+                   mType: String) extends TwitterObject
 
-  case class UserIds(previous_cursor: Long, ids: Seq[Long], next_cursor: Long)
+  case class UserIds(previous_cursor: Long, ids: Seq[Long], next_cursor: Long) extends TwitterObject
 
-  case class UserList(previous_cursor: Long, next_cursor: Long, users: Seq[User])
+  case class UserList(previous_cursor: Long, next_cursor: Long, users: Seq[User]) extends TwitterObject
 
-  case class UserTimeline(statuses: Seq[Tweet])
+  case class UserTimeline(statuses: Seq[Tweet]) extends TwitterObject
 
   implicit def UnavailableDecodeJson: DecodeJson[Unavailable] =
     DecodeJson(c => for {
@@ -182,21 +189,21 @@ object Codec {
         text <- (c --\ "text").as[String]
         user <- (c --\ "user").as[Option[User]]
       } yield Tweet(
-        coordinates,
-        created_at,
-        mentionLens.getAll(entities),
-        hashtagLens.getAll(entities),
-        media.getOrElse(List.empty[Media]),
-        urlLens.getAll(entities),
-        favorite_count,
-        id,
-        in_reply_to_status_id,
-        in_reply_to_user_id,
-        quoted_status_id,
-        retweet_count,
-        retweeted_status,
-        text,
-        user))
+          coordinates,
+          created_at,
+          mentionLens.getAll(entities),
+          hashtagLens.getAll(entities),
+          media.getOrElse(List.empty[Media]),
+          urlLens.getAll(entities),
+          favorite_count,
+          id,
+          in_reply_to_status_id,
+          in_reply_to_user_id,
+          quoted_status_id,
+          retweet_count,
+          retweeted_status,
+          text,
+          user))
   }
 
   implicit def PointDecodeJson: DecodeJson[Point] =
@@ -217,20 +224,25 @@ object Codec {
         mType <- (c --\ "type").as[String]
       } yield Media(expanded_url, source_status_id, mType))
 
-  implicit def UserIdsDecodeJson: DecodeJson[UserIds] = {
-    DecodeJson(c => for {
-      previous_cursor <- (c --\ "previous_cursor").as[Long]
-      ids <- (c --\ "ids").as[Seq[Long]]
-      next_cursor <- (c --\ "next_cursor").as[Long]
-    } yield UserIds(previous_cursor, ids, next_cursor))
-  }
+  implicit def UserIdsCodecJson: CodecJson[UserIds] =
+    CodecJson(
+      (u: UserIds) =>
+        ("ids" := u.ids) ->:
+        jEmptyObject,
+      c => for {
+        previous_cursor <- (c --\ "previous_cursor").as[Long]
+        ids <- (c --\ "ids").as[Seq[Long]]
+        next_cursor <- (c --\ "next_cursor").as[Long]
+      } yield UserIds(previous_cursor, ids, next_cursor))
 
-  implicit def UserListDecodeJson: DecodeJson[UserList] = {
-    DecodeJson(c => for {
-      previous_cursor <- (c --\ "previous_cursor").as[Long]
-      next_cursor <- (c --\ "next_cursor").as[Long]
-      users <- (c --\ "users").as[Seq[User]]
-    } yield UserList(previous_cursor, next_cursor, users))
-  }
-
+  implicit def UserListCodecJson: CodecJson[UserList] =
+    CodecJson(
+      (u: UserList) =>
+        ("users" := u.users) ->:
+        jEmptyObject,
+      c => for {
+        previous_cursor <- (c --\ "previous_cursor").as[Long]
+        next_cursor <- (c --\ "next_cursor").as[Long]
+        users <- (c --\ "users").as[Seq[User]]
+      } yield UserList(previous_cursor, next_cursor, users))
 }
