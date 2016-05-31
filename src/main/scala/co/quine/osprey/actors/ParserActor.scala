@@ -9,7 +9,7 @@ import akka.util.{ByteString, ByteStringBuilder}
 import argonaut.Argonaut._
 import argonaut._
 
-import co.quine.osprey.twitter.Resources._
+import co.quine.osprey.resources._
 
 object ParserActor {
   case class ClientRequest(uuid: String, resource: TwitterResource, eta: String)
@@ -44,8 +44,8 @@ object ParserActor {
         case "frids" => for {
           id <- (c --\ "args" --\ "id").as[Option[Long]]
           screenName <- (c --\ "args" --\ "screen_name").as[Option[String]]
-          all <- (c --\ "args" --\ "all").as[Boolean]
-        } yield FriendsIds(id, screenName, None, all)
+          count <- (c --\ "args" --\ "count").as[Int]
+        } yield FriendsIds(id, screenName, None, count)
         case "frlist" => for {
           id <- (c --\ "args" --\ "id").as[Option[Long]]
           screenName <- (c --\ "args" --\ "screen_name").as[Option[String]]
@@ -53,8 +53,8 @@ object ParserActor {
         case "foids" => for {
           id <- (c --\ "args" --\ "id").as[Option[Long]]
           screenName <- (c --\ "args" --\ "screen_name").as[Option[String]]
-          all <- (c --\ "args" --\ "all").as[Boolean]
-        } yield FollowersIds(id, screenName, None, all)
+          count <- (c --\ "args" --\ "count").as[Int]
+        } yield FollowersIds(id, screenName, None, count)
         case "folist" => for {
           id <- (c --\ "args" --\ "id").as[Option[Long]]
           screenName <- (c --\ "args" --\ "screen_name").as[Option[String]]
