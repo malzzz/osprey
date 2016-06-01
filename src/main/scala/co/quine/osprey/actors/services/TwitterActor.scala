@@ -4,7 +4,6 @@ package services
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.{Success, Failure}
 import scala.concurrent.duration._
 import scalaz._
 
@@ -27,7 +26,7 @@ class TwitterActor(val requests: ActorRef) extends Actor with ActorLogging {
   implicit val timeout = Timeout(10.seconds)
 
   def receive = {
-    case TwitterOperation(uuid, resource, client) => onOperation(uuid, resource, client)
+    case op@TwitterOperation(uuid, resource, client, retries) => onOperation(uuid, resource, client)
   }
 
   def onOperation(uuid: String, resource: TwitterResource, client: ActorRef) = {
