@@ -19,7 +19,6 @@ sealed trait TwitterResource {
   def url = s"$uri$path"
 
   def token(implicit gate: GatekeeperClient): Token
-
 }
 
 sealed trait CursoredResource extends TwitterResource {
@@ -51,6 +50,8 @@ case class FollowersIds(id: Option[Long] = None,
   def token(implicit gate: GatekeeperClient) = gate.followersIds
 
   def withCursor(c: Long) = copy(cursor = Some(c))
+
+  def decode(s: String): UserIds = Parse.decodeOption[UserIds](s).getOrElse(UserIds(0, Seq.empty[Long], 0))
 }
 
 case class FriendsIds(id: Option[Long] = None,
@@ -67,6 +68,8 @@ case class FriendsIds(id: Option[Long] = None,
   def token(implicit gate: GatekeeperClient) = gate.friendsIds
 
   def withCursor(c: Long) = copy(cursor = Some(c))
+
+  def decode(s: String): UserIds = Parse.decodeOption[UserIds](s).getOrElse(UserIds(0, Seq.empty[Long], 0))
 }
 
 case class UsersShow(id: Option[Long] = None, screenName: Option[String] = None) extends TwitterResource {
@@ -77,6 +80,8 @@ case class UsersShow(id: Option[Long] = None, screenName: Option[String] = None)
     screenName map ("screen_name" -> _)).flatten.toMap
 
   def token(implicit gate: GatekeeperClient) = gate.usersShow
+
+  def decode(s: String): Option[User] = Parse.decodeOption[User](s)
 }
 
 case class UsersLookup(id: Seq[Long] = Seq.empty[Long],
@@ -88,6 +93,8 @@ case class UsersLookup(id: Seq[Long] = Seq.empty[Long],
     Some("screen_name" -> screenName.mkString(","))).flatten.toMap
 
   def token(implicit gate: GatekeeperClient) = gate.usersLookup
+
+  def decode(s: String): Seq[User] = Parse.decodeOption[Seq[User]](s).getOrElse(Seq.empty[User])
 }
 
 case class StatusesLookup(id: Seq[Long]) extends TwitterResource {
@@ -96,6 +103,8 @@ case class StatusesLookup(id: Seq[Long]) extends TwitterResource {
   def params = Seq("id" -> id.mkString(",")).toMap
 
   def token(implicit gate: GatekeeperClient) = gate.statusesLookup
+
+  def decode(s: String): Seq[Tweet] = Parse.decodeOption[Seq[Tweet]](s).getOrElse(Seq.empty[Tweet])
 }
 
 case class StatusesShow(id: Long) extends TwitterResource {
@@ -104,6 +113,8 @@ case class StatusesShow(id: Long) extends TwitterResource {
   def params = Seq("id" -> id.toString).toMap
 
   def token(implicit gate: GatekeeperClient) = gate.statusesShow
+
+  def decode(s: String): Option[Tweet] = Parse.decodeOption[Tweet](s)
 }
 
 case class StatusesUserTimeline(id: Option[Long] = None,
@@ -126,6 +137,8 @@ case class StatusesUserTimeline(id: Option[Long] = None,
   def withCount(count: Int) = copy(count = count)
   def withMaxId(maxId: Long) = copy(maxId = Some(maxId))
   def withMaxId(maxId: Long, count: Int) = copy(maxId = Some(maxId), count = count)
+
+  def decode(s: String): Seq[Tweet] = Parse.decodeOption[Seq[Tweet]](s).getOrElse(Seq.empty[Tweet])
 }
 
 case class FriendsList(id: Option[Long] = None, screenName: Option[String] = None) extends TwitterResource {
@@ -136,6 +149,8 @@ case class FriendsList(id: Option[Long] = None, screenName: Option[String] = Non
     screenName map ("screen_name" -> _.toString)).flatten.toMap
 
   def token(implicit gate: GatekeeperClient) = gate.friendsList
+
+  def decode(s: String): UserList = Parse.decodeOption[UserList](s).getOrElse(UserList(0, 0, Seq.empty[User]))
 }
 
 case class FollowersList(id: Option[Long] = None, screenName: Option[String] = None) extends TwitterResource {
@@ -146,5 +161,7 @@ case class FollowersList(id: Option[Long] = None, screenName: Option[String] = N
     screenName map ("screen_name" -> _.toString)).flatten.toMap
 
   def token(implicit gate: GatekeeperClient) = gate.followersList
+
+  def decode(s: String): UserList = Parse.decodeOption[UserList](s).getOrElse(UserList(0, 0, Seq.empty[User]))
 }
 

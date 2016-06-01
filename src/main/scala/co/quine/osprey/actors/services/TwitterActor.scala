@@ -4,13 +4,15 @@ package services
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.{Success, Failure}
 import scala.concurrent.duration._
 import scalaz._
 
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
-import argonaut._, Argonaut._
+import argonaut.Argonaut._
+import argonaut._
 
 object TwitterActor {
   def props(requests: ActorRef) = Props(new TwitterActor(requests))
@@ -28,22 +30,33 @@ class TwitterActor(val requests: ActorRef) extends Actor with ActorLogging {
     case TwitterOperation(uuid, resource, client) => onOperation(uuid, resource, client)
   }
 
-  def onOperation(uuid: String, resource: TwitterResource, client: ActorRef) = resource match {
-    case r: CursoredResource =>
-      userIds(r) foreach {
+  def onOperation(uuid: String, resource: TwitterResource, client: ActorRef) = {
+    resource match {
+      case r: CursoredResource => userIds(r) onSuccess {
         case \/-(idSetComplete) => client ! Ok(uuid, idSetComplete.asJson)
         case -\/(idSetPartial) => client ! Partial(uuid, idSetPartial.asJson)
       }
-    case r: StatusesUserTimeline =>
-      userTimeline(r) foreach {
+      case r: StatusesUserTimeline => userTimeline(r) onSuccess {
         case \/-(completeTimeline) => client ! Ok(uuid, completeTimeline.asJson)
         case -\/(partialTimeline) => client ! Partial(uuid, partialTimeline.asJson)
       }
-    case r: UsersShow =>
-      httpRequest(r).map(handleResponse(_)(Parse.decodeOption[User])) foreach {
-        case \/-(Some(x)) => client ! Ok(uuid, x.asJson)
+      case r: UsersShow => requestDecodeResponse(r)(r.decode) onSuccess {
+        case \/-(Some(user)) => client ! Ok(uuid, user.asJson)
         case -\/(rateLimit) => client ! Failed(uuid, rateLimit.asJson)
       }
+      case r: UsersLookup => requestDecodeResponse(r)(r.decode) onSuccess {
+        case \/-(users) => client ! Ok(uuid, users.asJson)
+        case -\/(rateLimit) => client ! Failed(uuid, rateLimit.asJson)
+      }
+      case r: StatusesLookup => requestDecodeResponse(r)(r.decode) onSuccess {
+        case \/-(tweets) => client ! Ok(uuid, tweets.asJson)
+        case -\/(rateLimit) => client ! Failed(uuid, rateLimit.asJson)
+      }
+      case r: StatusesShow => requestDecodeResponse(r)(r.decode) onSuccess {
+        case \/-(Some(tweet)) => client ! Ok(uuid, tweet.asJson)
+        case -\/(rateLimit) => client ! Failed(uuid, rateLimit.asJson)
+      }
+    }
   }
 
   def handleResponse[T](response: HttpStringResponse)(decoder: String => T) = response.r match {
@@ -53,23 +66,18 @@ class TwitterActor(val requests: ActorRef) extends Actor with ActorLogging {
       -\/(Parse.decodeOption[RateLimit](r.body).getOrElse(RateLimit(System.currentTimeMillis / 1000)))
   }
 
+  def requestDecodeResponse[T](resource: TwitterResource)(decoder: String => T) =
+    httpRequest(resource).map(handleResponse(_)(decoder))
+
   def httpRequest(resource: TwitterResource): Future[HttpStringResponse] =
     (requests ? resource).mapTo[HttpStringResponse]
 
   def userIds(resource: CursoredResource): Future[IdSetPartial \/ IdSetComplete] = {
-
-    def checkResponse(response: HttpStringResponse) = response.r match {
-      case r if r.code == 200 =>
-        \/-(Parse.decodeOption[UserIds](r.body).getOrElse(UserIds(0, Seq.empty[Long], 0)))
-      case r if r.code == 430 =>
-        -\/(Parse.decodeOption[RateLimit](r.body).getOrElse(RateLimit(System.currentTimeMillis / 1000)))
-    }
-
     def recurseResource(nextCursor: Long, calls: Int, acc: Set[Long]): Future[IdSet] = {
       if (nextCursor != 0 && calls < resource.maxCalls) {
         for {
           response <- httpRequest(resource.withCursor(nextCursor))
-          complete <- checkResponse(response) match {
+          complete <- handleResponse(response)(Parse.decodeOption[UserIds](_).getOrElse(UserIds(0, Seq.empty[Long], 0))) match {
             case -\/(rateLimit) => Future.successful(IdSetPartial(rateLimit.ttl, acc))
             case \/-(userIds) => recurseResource(userIds.next_cursor, calls + 1, acc ++ userIds.ids)
           }
@@ -88,14 +96,6 @@ class TwitterActor(val requests: ActorRef) extends Actor with ActorLogging {
   }
 
   def userTimeline(resource: StatusesUserTimeline): Future[PartialTimeline \/ CompleteTimeline] = {
-
-    def checkResponse(response: HttpStringResponse): RateLimit \/ Seq[Tweet] = response.r match {
-      case r if r.code == 200 =>
-        \/-(Parse.decodeOption[Seq[Tweet]](r.body).getOrElse(Seq.empty[Tweet]))
-      case r if r.code == 430 =>
-        -\/(Parse.decodeOption[RateLimit](r.body).getOrElse(RateLimit(System.currentTimeMillis / 1000)))
-    }
-
     def recurseTimeline(t: Seq[Tweet]): Future[Timeline] = {
       val maxLength = resource.count
       val userStatusCount = t.head.user.map(_.statuses_count).getOrElse(0)
@@ -110,7 +110,7 @@ class TwitterActor(val requests: ActorRef) extends Actor with ActorLogging {
 
         for {
           nextTimeline <- httpRequest(resource.withMaxId(maxId, countThisCall))
-          completeTimeline <- checkResponse(nextTimeline) match {
+          completeTimeline <- handleResponse(nextTimeline)(Parse.decodeOption[Seq[Tweet]](_).getOrElse(Seq.empty[Tweet])) match {
             case -\/(rateLimit) => Future.successful(PartialTimeline(rateLimit.ttl, t))
             case \/-(timeline) => recurseTimeline(t ++ timeline)
           }
@@ -120,7 +120,7 @@ class TwitterActor(val requests: ActorRef) extends Actor with ActorLogging {
 
     def buildTimeline = for {
       firstCall <- httpRequest(resource.withCount(200))
-      recursiveCall <- checkResponse(firstCall) match {
+      recursiveCall <- handleResponse(firstCall)(Parse.decodeOption[Seq[Tweet]](_).getOrElse(Seq.empty[Tweet])) match {
         case -\/(rateLimit) => Future.successful(PartialTimeline(rateLimit.ttl, Seq.empty[Tweet]))
         case \/-(tweets) if tweets.nonEmpty => recurseTimeline(tweets)
         case _ => Future.successful(CompleteTimeline(Seq.empty[Tweet]))

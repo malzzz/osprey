@@ -3,7 +3,7 @@ package responses
 
 import argonaut._
 
-sealed trait ServiceResponse {
+sealed trait ServiceResponse extends Product with Serializable {
   val uuid: String
   val response: Json
 }

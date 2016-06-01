@@ -30,8 +30,8 @@ class ClientActor(osprey: ActorRef, client: ActorRef) extends Actor with ActorLo
       |{
       |   "uuid": "abc-1234-defg-5678",
       |   "service": "twitter",
-      |   "method": "foids",
-      |   "args": { "screen_name": "charli_xcx", "count": 10000 },
+      |   "method": "susertimeline",
+      |   "args": { "screen_name": "charli_xcx", "count": 200 },
       |   "eta": "Some date"
       |}
     """.stripMargin
