@@ -31,6 +31,7 @@ lazy val versions = new {
   val scalaz = "7.1.8"
   val argonaut = "6.1"
   val scalajhttp = "2.3.0"
+  val cassandraDriver = "3.0.0"
 }
 
 libraryDependencies ++= Seq(
@@ -40,7 +41,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka"           %% "akka-actor" % versions.akka,
   "org.scalaj"                  %% "scalaj-http" % versions.scalajhttp,
   "io.argonaut"                 %% "argonaut" % versions.argonaut,
-  "org.scalaz"                  %% "scalaz-core" % versions.scalaz
+  "org.scalaz"                  %% "scalaz-core" % versions.scalaz,
+  "com.datastax.cassandra"       % "cassandra-driver-core" % versions.cassandraDriver
 )
 
 evictionWarningOptions in update := EvictionWarningOptions.default

@@ -6,6 +6,7 @@ import scala.concurrent.duration._
 import akka.actor._
 import akka.io.Tcp._
 import akka.util.{ByteString, Timeout}
+import argonaut._, Argonaut._
 
 object ClientActor {
 
@@ -19,6 +20,7 @@ class ClientActor(osprey: ActorRef, client: ActorRef) extends Actor with ActorLo
   import ClientActor._
   import ParserActor._
   import responses._
+  import codecs.TwitterCodec._
   import context.dispatcher
 
   implicit val timeout = Timeout(5.seconds)
@@ -30,8 +32,8 @@ class ClientActor(osprey: ActorRef, client: ActorRef) extends Actor with ActorLo
       |{
       |   "uuid": "abc-1234-defg-5678",
       |   "service": "twitter",
-      |   "method": "susertimeline",
-      |   "args": { "screen_name": "charli_xcx", "count": 200 },
+      |   "method": "ushow",
+      |   "args": { "screen_name": "charli_xcx" },
       |   "eta": "Some date"
       |}
     """.stripMargin
@@ -55,7 +57,23 @@ class ClientActor(osprey: ActorRef, client: ActorRef) extends Actor with ActorLo
   }
 
   def onResponse(r: ServiceResponse) = {
-    val encodedResponse = s"${r.uuid}##${r.response.nospaces}"
+    val json: Json = r.response match {
+      case resp: RateLimit => resp.asJson
+      case resp: User => resp.asJson
+      case resp: Tweet => resp.asJson
+      case resp: Media => resp.asJson
+      case resp: UserIds => resp.asJson
+      case resp: IdSetComplete => resp.asJson
+      case resp: IdSetPartial => resp.asJson
+      case resp: UserSetComplete => resp.asJson
+      case resp: UserSetPartial => resp.asJson
+      case resp: CompleteTimeline => resp.asJson
+      case resp: PartialTimeline => resp.asJson
+      case resp: UserList => resp.asJson
+      case _ => throw new Exception("No encoder available")
+    }
+
+    val encodedResponse = s"${r.uuid}##${json.nospaces}"
     val responseString = s"$$${encodedResponse.length}\r\n$encodedResponse\r\n"
     writeToSocket(responseString)
   }

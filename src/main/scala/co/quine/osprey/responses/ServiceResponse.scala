@@ -1,12 +1,23 @@
 package co.quine.osprey
 package responses
 
-import argonaut._
+import akka.actor._
 
 sealed trait ServiceResponse extends Product with Serializable {
+  val client: ActorRef
   val uuid: String
-  val response: Json
+  val response: Response
+  val status: String
 }
-case class Ok(uuid: String, response: Json) extends ServiceResponse
-case class Partial(uuid: String, response: Json) extends ServiceResponse
-case class Failed(uuid: String, response: Json) extends ServiceResponse
+
+case class Ok(client: ActorRef, uuid: String, response: Response) extends ServiceResponse {
+  val status = "ok"
+}
+
+case class Partial(client: ActorRef, uuid: String, response: Response) extends ServiceResponse {
+  val status = "partial"
+}
+
+case class Failed(client: ActorRef, uuid: String, response: Response) extends ServiceResponse {
+  val status = "failed"
+}

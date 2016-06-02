@@ -1,7 +1,6 @@
 package co.quine.osprey
 package resources
 
-import scala.collection.mutable
 import argonaut._, Argonaut._
 
 import co.quine.gatekeeperclient.GatekeeperClient._
@@ -27,20 +26,20 @@ sealed trait CursoredResource extends TwitterResource {
   val cursor: Option[Long]
   val count: Int
 
-  val resultStash = mutable.Set[Long]()
-
-  def stashResult(r: TraversableOnce[Long]) = resultStash ++= r
-
-  def maxCalls = math.ceil(count.toDouble / 5000).toInt
+  def maxCalls: Int
 
   def withCursor(c: Long): CursoredResource
 }
 
+sealed trait CursoredIdList extends CursoredResource
+
 case class FollowersIds(id: Option[Long] = None,
                         screenName: Option[String] = None,
                         cursor: Option[Long] = None,
-                        count: Int = 5000) extends CursoredResource {
+                        count: Int = 5000) extends CursoredIdList {
   val path = "/followers/ids.json"
+
+  def maxCalls = math.ceil(count.toDouble / 5000).toInt
 
   def params = Seq(
     id map ("user_id" -> _.toString),
@@ -57,8 +56,10 @@ case class FollowersIds(id: Option[Long] = None,
 case class FriendsIds(id: Option[Long] = None,
                       screenName: Option[String] = None,
                       cursor: Option[Long] = None,
-                      count: Int = 5000) extends CursoredResource {
+                      count: Int = 5000) extends CursoredIdList {
   val path = "/friends/ids.json"
+
+  def maxCalls = math.ceil(count.toDouble / 5000).toInt
 
   def params = Seq(
     id map ("user_id" -> _.toString),
@@ -70,6 +71,47 @@ case class FriendsIds(id: Option[Long] = None,
   def withCursor(c: Long) = copy(cursor = Some(c))
 
   def decode(s: String): UserIds = Parse.decodeOption[UserIds](s).getOrElse(UserIds(0, Seq.empty[Long], 0))
+}
+
+sealed trait CursoredList extends CursoredResource
+
+case class FriendsList(id: Option[Long] = None,
+                       screenName: Option[String] = None,
+                       cursor: Option[Long] = None,
+                       count: Int = 200) extends CursoredList {
+  val path = "/friends/list.json"
+
+  def maxCalls = math.ceil(count.toDouble / 200).toInt
+
+  def withCursor(c: Long) = copy(cursor = Some(c))
+
+  def params = Seq(
+    id map ("user_id" -> _.toString),
+    screenName map ("screen_name" -> _.toString)).flatten.toMap
+
+  def token(implicit gate: GatekeeperClient) = gate.friendsList
+
+  def decode(s: String): UserList = Parse.decodeOption[UserList](s).getOrElse(UserList(0, 0, Seq.empty[User]))
+}
+
+case class FollowersList(id: Option[Long] = None,
+                         screenName: Option[String] = None,
+                         cursor: Option[Long] = None,
+                         count: Int = 200) extends CursoredList {
+
+  val path = "/followers/list.json"
+
+  def maxCalls = math.ceil(count.toDouble / 200).toInt
+
+  def withCursor(c: Long) = copy(cursor = Some(c))
+
+  def params = Seq(
+    id map ("user_id" -> _.toString),
+    screenName map ("screen_name" -> _.toString)).flatten.toMap
+
+  def token(implicit gate: GatekeeperClient) = gate.followersList
+
+  def decode(s: String): UserList = Parse.decodeOption[UserList](s).getOrElse(UserList(0, 0, Seq.empty[User]))
 }
 
 case class UsersShow(id: Option[Long] = None, screenName: Option[String] = None) extends TwitterResource {
@@ -141,27 +183,4 @@ case class StatusesUserTimeline(id: Option[Long] = None,
   def decode(s: String): Seq[Tweet] = Parse.decodeOption[Seq[Tweet]](s).getOrElse(Seq.empty[Tweet])
 }
 
-case class FriendsList(id: Option[Long] = None, screenName: Option[String] = None) extends TwitterResource {
-  val path = "/friends/list.json"
-
-  def params = Seq(
-    id map ("user_id" -> _.toString),
-    screenName map ("screen_name" -> _.toString)).flatten.toMap
-
-  def token(implicit gate: GatekeeperClient) = gate.friendsList
-
-  def decode(s: String): UserList = Parse.decodeOption[UserList](s).getOrElse(UserList(0, 0, Seq.empty[User]))
-}
-
-case class FollowersList(id: Option[Long] = None, screenName: Option[String] = None) extends TwitterResource {
-  val path = "/followers/list.json"
-
-  def params = Seq(
-    id map ("user_id" -> _.toString),
-    screenName map ("screen_name" -> _.toString)).flatten.toMap
-
-  def token(implicit gate: GatekeeperClient) = gate.followersList
-
-  def decode(s: String): UserList = Parse.decodeOption[UserList](s).getOrElse(UserList(0, 0, Seq.empty[User]))
-}
 

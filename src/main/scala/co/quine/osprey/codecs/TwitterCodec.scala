@@ -192,6 +192,12 @@ object TwitterCodec {
   implicit def IdSetPartialEncodeJson: EncodeJson[IdSetPartial] =
     EncodeJson((i: IdSetPartial) => ("ttl" := i.ttl) ->: ("ids" := i.ids) ->: jEmptyObject)
 
+  implicit def UserSetCompleteEncodeJson: EncodeJson[UserSetComplete] =
+    EncodeJson((i: UserSetComplete) => ("users" := i.users) ->: jEmptyObject)
+
+  implicit def UserSetPartialEncodeJson: EncodeJson[UserSetPartial] =
+    EncodeJson((i: UserSetPartial) => ("ttl" := i.ttl) ->: ("users" := i.users) ->: jEmptyObject)
+
   implicit def CompleteTimelineEncodeJson: EncodeJson[CompleteTimeline] =
     EncodeJson((t: CompleteTimeline) => ("statuses" := t.statuses) ->: jEmptyObject)
 
